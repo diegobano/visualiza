@@ -9,7 +9,18 @@
     	<div id="chart"></div>
     	
     	<script type="text/javascript">
-        // Insertar snippets acá (README > Primeros pasos en D3)       		    
+            var svg = d3.select("#chart") // Retorna el DIV con id="chart" 
+                .append("svg") // Adjunta un elemento de tipo SVG y lo retorna
+                .attr("width", 700) // Seteamos el ancho a 200px 
+                .attr("height", 400) // Seteamos el alto a 200px
+
+            var circle = svg.append("circle") // Adjuntamos un elemento circle al SVG
+                .attr("cx", 50) // Posicionamos el elemento en (50,50)
+                .attr("cy", 50)
+                .attr("r", 40) // Radio 40 px
+                .style("fill", "pink") // Color de fondo rosado
+                .style("stroke", "green") // Color del borde verde
+                .style("stroke-width", 5) // Grosor del borde 5px
     	</script>
     </body>
 </html>
