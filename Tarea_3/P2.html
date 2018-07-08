@@ -103,6 +103,12 @@
                                 ]
                             }
 
+                            // Crear tooltip interactivo
+                            var tooltip = d3.select("body")
+                                .append("div")
+                                .attr("class", "tooltip")
+                                .style("opacity", 0);
+
                             // var margin = {
                             //     top: 20,
                             //     right: 10,
@@ -159,7 +165,28 @@
                                 .append("path")
                                 .attr("fill", d => { while (d.depth > 1 && d.depth != 3) d = d.parent; return color(d.data.name); })
                                 .attr("fill-opacity", d => arcVisible(d.current) ? (d.children ? 0.6 : 0.4) : 0)
-                                .attr("d", d => arc(d.current));
+                                .attr("d", d => arc(d.current))
+                                .on("mouseover", function(d) {
+                                    var texto
+                                    if (d.depth == 1) {
+                                        texto = `<div>Alumnos ${d.data.name}<br>` +
+                                            `Posee información de ${d.value} alumnos</div>`
+                                    } else if (d.depth == 2) {
+                                        texto = `<div>Región número ${d.data.name}<br>` +
+                                            `Posee un ${parseFloat(d.value / d.parent.value * 100).toFixed(2)}% de los alumnos de ${d.parent.data.name}</div>`
+                                    } else if (d.depth == 3) {
+                                        texto = `<div>Alumnos ${d.data.name}<br>` +
+                                            `Posee un ${parseFloat(d.value / d.parent.value * 100).toFixed(2)}% de los alumnos de la región número ${d.parent.data.name}</div>`
+                                    }
+                                    tooltip.html(
+                                        texto)
+                                        .style("left", (d3.event.pageX + 5) + "px")
+                                        .style("top", (d3.event.pageY - 28) + "px")
+                                        .style("opacity", 1)
+                                })
+                                .on("mouseout", function(d) {
+                                    tooltip.style("opacity", 0)
+                                })
 
                             path.filter(d => d.children)
                                 .style("cursor", "pointer")
