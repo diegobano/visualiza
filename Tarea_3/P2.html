@@ -3,7 +3,7 @@
     <head>
     	<meta charset="utf-8">
         <title>Tarea 3 - P2</title>
-        <script src="d3.min.js" charset="utf-8"></script>
+        <script src="d3.v5.min.js" charset="utf-8"></script>
  		<style type="text/css">
         	.tooltip {
 			  position: absolute;
@@ -15,112 +15,270 @@
 		</style>
     </head>
     <body>
-    	<div id="chart" class="clase1"></div>
+    	<div id="chart"></div>
     	<script type="text/javascript">
-            d3.csv("IVE-SINAE-MEDIA.csv", function(error, data) {
-                // Casting de String -> Number
-                data.forEach(function(d){
-                    d.TOTAL_MATRICULA_2015 = +d.TOTAL_MATRICULA_2015;
-                    d.IVE_SINAE_2016 = +d.IVE_SINAE_2016;
-                    d.PRIMERA_PRIORIDAD = +d.PRIMERA_PRIORIDAD;
-                    d.PRIMERA_PRIORIDAD_P = +d.PRIMERA_PRIORIDAD / d.TOTAL_MATRICULA_2015 * 10;
-                });
-                
-                const root = d3.layout.partition(data);
-                debugger
-                root.forEach(d => d.current = d);
-                
-                const svg = d3.select(DOM.svg(width, width))
-                    .style("width", "100%")
-                    .style("height", "auto")
-                    .style("font", "10px sans-serif");
-                
-                const g = svg.append("g")
-                    .attr("transform", `translate(${width / 2},${width / 2})`);
-                
-                const path = g.append("g")
-                    .selectAll("path")
-                    .data(root.descendants().slice(1))
-                    .enter().append("path")
-                    .attr("fill", d => { while (d.depth > 1) d = d.parent; return color(d.data.name); })
-                    .attr("fill-opacity", d => arcVisible(d.current) ? (d.children ? 0.6 : 0.4) : 0)
-                    .attr("d", d => arc(d.current));
-                
-                path.filter(d => d.children)
-                    .style("cursor", "pointer")
-                    .on("click", clicked);
-                
-                path.append("title")
-                    .text(d => `${d.ancestors().map(d => d.data.name).reverse().join("/")}\n${format(d.value)}`);
-                
-                const label = g.append("g")
-                    .attr("pointer-events", "none")
-                    .attr("text-anchor", "middle")
-                    .style("user-select", "none")
-                    .selectAll("text")
-                    .data(root.descendants().slice(1))
-                    .enter().append("text")
-                    .attr("dy", "0.35em")
-                    .attr("fill-opacity", d => +labelVisible(d.current))
-                    .attr("transform", d => labelTransform(d.current))
-                    .text(d => d.data.name);
-                
-                const parent = g.append("circle")
-                    .datum(root)
-                    .attr("r", radius)
-                    .attr("fill", "none")
-                    .attr("pointer-events", "all")
-                    .on("click", clicked);
-                
-                function clicked(p) {
-                    parent.datum(p.parent || root);
-                
-                    root.each(d => d.target = {
-                    x0: Math.max(0, Math.min(1, (d.x0 - p.x0) / (p.x1 - p.x0))) * 2 * Math.PI,
-                    x1: Math.max(0, Math.min(1, (d.x1 - p.x0) / (p.x1 - p.x0))) * 2 * Math.PI,
-                    y0: Math.max(0, d.y0 - p.depth),
-                    y1: Math.max(0, d.y1 - p.depth)
-                    });
-                
-                    const t = g.transition().duration(750);
-                
-                    // Transition the data on all arcs, even the ones that aren’t visible,
-                    // so that if this transition is interrupted, entering arcs will start
-                    // the next transition from the desired position.
-                    path.transition(t)
-                        .tween("data", d => {
-                        const i = d3.interpolate(d.current, d.target);
-                        return t => d.current = i(t);
+            d3.csv("IVE-SINAE-MEDIA.csv")
+                .then(function(data_media) {
+                    d3.csv("IVE-SINAE-BASICA.csv")
+                        .then(function(data_basica) {
+                            // Casting de String -> Number
+                            data_media.forEach(function(d){
+                                d.TOTAL_MATRICULA_2015 = +d.TOTAL_MATRICULA_2015;
+                                d.IVE_SINAE_2016 = +d.IVE_SINAE_2016;
+                                d.PRIMERA_PRIORIDAD = +d.PRIMERA_PRIORIDAD;
+                                d.SEGUNDA_PRIORIDAD = +d.SEGUNDA_PRIORIDAD;
+                                d.TERCERA_PRIORIDAD = +d.TERCERA_PRIORIDAD;
+                            });
+
+                            data_basica.forEach(function(d){
+                                d.TOTAL_MATRICULA_2015 = +d.TOTAL_MATRICULA_2015;
+                                d.IVE_SINAE_2016 = +d.IVE_SINAE_2016;
+                                d.PRIMERA_PRIORIDAD = +d.PRIMERA_PRIORIDAD;
+                                d.SEGUNDA_PRIORIDAD = +d.SEGUNDA_PRIORIDAD;
+                                d.TERCERA_PRIORIDAD = +d.TERCERA_PRIORIDAD;
+                            });
+
+                            let nestedData_basica = d3.nest()
+                                .key(function(d) { return d.COD_REGION })
+                                .key(function (d) { return d.DEPENDENCIA })
+                                .rollup(function (v) { return {
+                                    PRIMERA_PRIORIDAD: d3.sum(v, function (d) { return d.PRIMERA_PRIORIDAD }),
+                                    SEGUNDA_PRIORIDAD: d3.sum(v, function (d) { return d.SEGUNDA_PRIORIDAD }),
+                                    TERCERA_PRIORIDAD: d3.sum(v, function (d) { return d.TERCERA_PRIORIDAD }),
+                                    NO_VULNERABLES: d3.sum(v, function(d) { 
+                                        return d.TOTAL_MATRICULA_2015 - (d.PRIMERA_PRIORIDAD + d.SEGUNDA_PRIORIDAD + d.TERCERA_PRIORIDAD)})
+                                }})
+                                .entries(data_basica)
+                            
+                            let nestedData_media = d3.nest()
+                                .key(function (d) { return d.COD_REGION })
+                                .key(function (d) { return d.DEPENDENCIA })
+                                .rollup(function (v) { return {
+                                    PRIMERA_PRIORIDAD: d3.sum(v, function (d) { return d.PRIMERA_PRIORIDAD }),
+                                    SEGUNDA_PRIORIDAD: d3.sum(v, function (d) { return d.SEGUNDA_PRIORIDAD }),
+                                    TERCERA_PRIORIDAD: d3.sum(v, function (d) { return d.TERCERA_PRIORIDAD }),
+                                    NO_VULNERABLES: d3.sum(v, function(d) { 
+                                        return d.TOTAL_MATRICULA_2015 - (d.PRIMERA_PRIORIDAD + d.SEGUNDA_PRIORIDAD + d.TERCERA_PRIORIDAD)})
+                                }})
+                                .entries(data_media)
+                            tree_media = []
+
+                            nestedData_media.forEach(function(dep) {
+                                let inner_media = []
+                                dep.values.forEach(function (d) {
+                                    inner_media.push({
+                                        name: d.key,
+                                        children: [
+                                            {name: 'Primera Prioridad',
+                                            size: d.value.PRIMERA_PRIORIDAD},
+                                            {name: 'Segunda Prioridad',
+                                            size: d.value.SEGUNDA_PRIORIDAD},
+                                            {name: 'Tercera Prioridad',
+                                            size: d.value.TERCERA_PRIORIDAD},
+                                            {name: 'No Vulnerables',
+                                            size: d.value.NO_VULNERABLES}
+                                        ]
+                                    })
+                                })
+                                tree_media.push({
+                                    name: dep.key,
+                                    children: inner_media
+                                })
+                            })
+
+                            tree_basica = []
+
+                            nestedData_basica.forEach(function(dep) {
+                                let inner_basica = []
+                                dep.values.forEach(function (d) {
+                                    inner_basica.push({
+                                        name: d.key,
+                                        children: [
+                                            {name: 'Primera Prioridad',
+                                            size: d.value.PRIMERA_PRIORIDAD},
+                                            {name: 'Segunda Prioridad',
+                                            size: d.value.SEGUNDA_PRIORIDAD},
+                                            {name: 'Tercera Prioridad',
+                                            size: d.value.TERCERA_PRIORIDAD},
+                                            {name: 'No Vulnerables',
+                                            size: d.value.NO_VULNERABLES}
+                                        ]
+                                    })
+                                })
+                                tree_basica.push({
+                                    name: dep.key,
+                                    children: inner_basica
+                                })
+                            })
+
+
+                            var data = {
+                                name: 'Distribución de estudiantes vulnerables en Chile',
+                                children: [
+                                    {name: 'Educación Básica', children: tree_basica},
+                                    {name: 'Educación Media', children: tree_media}
+                                ]
+                            }
+
+                            // Crear tooltip interactivo
+                            var tooltip = d3.select("body")
+                                .append("div")
+                                .attr("class", "tooltip")
+                                .style("opacity", 0);
+                            
+                            partition = data => {
+                                const root = d3.hierarchy(data)
+                                    .sum(d => d.size)
+                                    .sort((a, b) => b.value - a.value);
+                                return d3.partition()
+                                    .size([2 * Math.PI, root.height + 1])
+                                    (root);
+                                }
+
+                            color = d3.scaleOrdinal().range(d3.quantize(d3.interpolateRainbow, 9))
+
+                            format = d3.format(",d")
+                            
+                            width = 800
+                            
+                            radius = width / 6
+
+                            arc = d3.arc()
+                                .startAngle(d => d.x0)
+                                .endAngle(d => d.x1)
+                                .padAngle(d => Math.min((d.x1 - d.x0) / 2, 0.005))
+                                .padRadius(radius * 1.5)
+                                .innerRadius(d => d.y0 * radius)
+                                .outerRadius(d => Math.max(d.y0 * radius, d.y1 * radius - 1))
+
+                            const root = partition(data);
+
+                            root.each(d => d.current = d);
+
+                            const svg = d3.select("#chart").append("svg")
+                                .style("width", "850px")
+                                .style("height", "850px")
+                                .style("font", "16px sans-serif");
+
+                            const g = svg.append("g")
+                                .attr("transform", `translate(${width / 2},${width / 2})`);
+
+                            const path = g.append("g")
+                                .selectAll("path")
+                                .data(root.descendants().slice(1))
+                                .enter()
+                                .append("path")
+                                .attr("fill", d => { while (d.depth > 1 && d.depth < 3) d = d.parent; return color(d.data.name); })
+                                .attr("fill-opacity", d => arcVisible(d.current) ? (d.children ? 0.6 : 0.4) : 0)
+                                .attr("d", d => arc(d.current))
+                                .on("mouseover", function(d) {
+                                    var texto
+                                    if (d.depth == 1) {
+                                        texto = `<div>Alumnos ${d.data.name}<br>` +
+                                            `Posee información de ${d.value} alumnos</div>`
+                                    } else if (d.depth == 2) {
+                                        texto = `<div>Región número ${d.data.name}<br>` +
+                                            `Posee un ${parseFloat(d.value / d.parent.value * 100).toFixed(2)}% de los alumnos de ${d.parent.data.name}</div>`
+                                    } else if (d.depth == 3) {
+                                        texto = `<div>DEPENDENCIA: ${d.data.name}<br>` +
+                                            `Posee un ${parseFloat(d.value / d.parent.value * 100).toFixed(2)}% de los alumnos de la región ${d.parent.data.name}</div>`
+                                    } else if (d.depth == 4) {
+                                        texto = `<div>Alumnos ${d.data.name}<br>` +
+                                            `Componen un ${parseFloat(d.value / d.parent.value * 100).toFixed(2)}% de los alumnos de colegios con dependencia ${d.parent.data.name} en la región ${d.parent.parent.data.name}</div>`
+                                    }
+                                    tooltip.html(
+                                        texto)
+                                        .style("left", (d3.event.pageX + 5) + "px")
+                                        .style("top", (d3.event.pageY - 28) + "px")
+                                        .style("opacity", 1)
+                                })
+                                .on("mouseout", function(d) {
+                                    tooltip.style("opacity", 0)
+                                })
+
+                            path.filter(d => d.children)
+                                .style("cursor", "pointer")
+                                .on("click", clicked);
+
+                            path.append("title")
+                                .text(d => `${d.ancestors().map(d => d.data.name).reverse().join("/")}\n${format(d.value)}`);
+
+                            const label = g.append("g")
+                                .attr("pointer-events", "none")
+                                .attr("text-anchor", "middle")
+                                .style("user-select", "none")
+                                .selectAll("text")
+                                .data(root.descendants().slice(1))
+                                .enter()
+                                .append("text")
+                                .attr("dy", "0.35em")
+                                .attr("fill-opacity", d => +labelVisible(d.current))
+                                .attr("transform", d => labelTransform(d.current))
+                                .text(function (d) { 
+                                    if (d.data.name.length > 15) {
+                                        return d.data.name.split(' ').map(n => n[0]).join('.') + '.';
+                                    } else {
+                                        return d.data.name;
+                                    }
+                                });
+
+                            const parent = g.append("circle")
+                                .datum(root)
+                                .attr("r", radius)
+                                .attr("fill", "none")
+                                .attr("pointer-events", "all")
+                                .on("click", clicked);
+
+                            function clicked(p) {
+                                parent.datum(p.parent || root);
+
+                                root.each(d => d.target = {
+                                    x0: Math.max(0, Math.min(1, (d.x0 - p.x0) / (p.x1 - p.x0))) * 2 * Math.PI,
+                                    x1: Math.max(0, Math.min(1, (d.x1 - p.x0) / (p.x1 - p.x0))) * 2 * Math.PI,
+                                    y0: Math.max(0, d.y0 - p.depth),
+                                    y1: Math.max(0, d.y1 - p.depth)
+                                });
+
+                                const t = g.transition().duration(750);
+
+                                // Transition the data on all arcs, even the ones that aren’t visible,
+                                // so that if this transition is interrupted, entering arcs will start
+                                // the next transition from the desired position.
+                                path.transition(t)
+                                    .tween("data", d => {
+                                        const i = d3.interpolate(d.current, d.target);
+                                        return t => d.current = i(t);
+                                    })
+                                    .filter(function(d) {
+                                    return +this.getAttribute("fill-opacity") || arcVisible(d.target);
+                                    })
+                                    .attr("fill-opacity", d => arcVisible(d.target) ? (d.children ? 0.6 : 0.4) : 0)
+                                    .attrTween("d", d => () => arc(d.current));
+
+                                label.filter(function(d) {
+                                    return +this.getAttribute("fill-opacity") || labelVisible(d.target);
+                                    }).transition(t)
+                                    .attr("fill-opacity", d => +labelVisible(d.target))
+                                    .attrTween("transform", d => () => labelTransform(d.current));
+                            }
+
+                            function arcVisible(d) {
+                            return d.y1 <= 3 && d.y0 >= 1 && d.x1 > d.x0;
+                            }
+
+                            function labelVisible(d) {
+                            return d.y1 <= 3 && d.y0 >= 1 && (d.y1 - d.y0) * (d.x1 - d.x0) > 0.03;
+                            }
+
+                            function labelTransform(d) {
+                            const x = (d.x0 + d.x1) / 2 * 180 / Math.PI;
+                            const y = (d.y0 + d.y1) / 2 * radius;
+                            return `rotate(${x - 90}) translate(${y},0) rotate(${x < 180 ? 0 : 180})`;
+                            }
+
+                            return svg.node();
                         })
-                    .filter(function(d) {
-                        return +this.getAttribute("fill-opacity") || arcVisible(d.target);
-                    })
-                        .attr("fill-opacity", d => arcVisible(d.target) ? (d.children ? 0.6 : 0.4) : 0)
-                        .attrTween("d", d => () => arc(d.current));
-                
-                    label.filter(function(d) {
-                        return +this.getAttribute("fill-opacity") || labelVisible(d.target);
-                    }).transition(t)
-                        .attr("fill-opacity", d => +labelVisible(d.target))
-                        .attrTween("transform", d => () => labelTransform(d.current));
-                }
-                
-                function arcVisible(d) {
-                    return d.y1 <= 3 && d.y0 >= 1 && d.x1 > d.x0;
-                }
-                
-                function labelVisible(d) {
-                    return d.y1 <= 3 && d.y0 >= 1 && (d.y1 - d.y0) * (d.x1 - d.x0) > 0.03;
-                }
-                
-                function labelTransform(d) {
-                    const x = (d.x0 + d.x1) / 2 * 180 / Math.PI;
-                    const y = (d.y0 + d.y1) / 2 * radius;
-                    return `rotate(${x - 90}) translate(${y},0) rotate(${x < 180 ? 0 : 180})`;
-                }
-                
-                return svg.node();
-            }); 
+                }); 
     	</script>
     </body>
 </html>
